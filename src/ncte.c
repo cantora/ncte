@@ -139,7 +139,7 @@ void loop(VTerm *vt, int master) {
 
 		block_winch();
 		
-		while( screen_getch(&ch) == 0 && vterm_output_get_buffer_remaining(vt) > 0 ) {
+		while(vterm_output_get_buffer_remaining(vt) > 0 && screen_getch(&ch) == 0 ) {
 			vterm_input_push_char(vt, VTERM_MOD_NONE, (uint32_t) ch);
 		}
 
