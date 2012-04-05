@@ -1,0 +1,14 @@
+
+ncte - ncurses terminal emulator
+
+   a small demonstration of an ncurses based terminal emulator
+   using libvterm (https://code.launchpad.net/~leonerd/libvterm)
+
+
+compilation:
+
+   the make file will use the bzr utility to checkout a copy of libvterm
+   from launchpad, so if you dont have bzr installed you have to create
+   the ./libvterm directory with all the required contents in some other
+   way.
+   
