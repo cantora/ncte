@@ -157,11 +157,10 @@ void loop(VTerm *vt, int master) {
 			total_read = 0;
 			n_read = 0;
 			do {
-				total_read += n_read;
 				/*if(total_read > 0) 
 					fprintf(stderr, "read %d/%d bytes\n", (int) total_read, BUF_SIZE);*/
 				n_read = read(master, buf + total_read, 512);
-			} while(n_read > 0 && (total_read + n_read < BUF_SIZE - 512) );
+			} while(n_read > 0 && ( (total_read += n_read) + 512 <= BUF_SIZE) );
 			
 			if(n_read == 0) { 
 				return; /* the master pty is closed */
