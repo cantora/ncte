@@ -301,7 +301,7 @@ static void update_cell(VTermScreen *vts, VTermPos pos) {
 	cchar_t cch;
 	wchar_t *wch;
 	wchar_t erasech = L' ';
-	int maxx,maxy;
+	int maxx, maxy;
 
 	getmaxyx(stdscr, maxy, maxx);
 
@@ -328,6 +328,16 @@ static void update_cell(VTermScreen *vts, VTermPos pos) {
 
 }
 
+void screen_redraw() {
+	if(redrawwin(stdscr) == ERR)
+		err_exit(0, "redrawwin failed!");
+}
+
+void screen_refresh() {
+	if(refresh() == ERR)
+		err_exit(0, "refresh failed!");
+}
+
 int screen_damage(VTermRect rect, void *user) {
 	VTermScreen *vts = vterm_obtain_screen(g_vt);
 	VTermPos pos;
@@ -349,8 +359,7 @@ int screen_damage(VTermRect rect, void *user) {
 	if(move(y,x) == ERR) 
 		err_exit(0, "move failed: %d/%d %d/%d", y, maxy, x, maxx);
 
-	if(refresh() == ERR)
-		err_exit(0, "refresh failed!");
+	/*fprintf(stderr, "\tdamage: (%d,%d) (%d,%d) \n", rect.start_row, rect.start_col, rect.end_row, rect.end_col);*/
 
 	return 1;
 }
@@ -378,8 +387,7 @@ int screen_movecursor(VTermPos pos, VTermPos oldpos, int visible, void *user) {
 	if(move(pos.row, pos.col) == ERR)
 		err_exit(0, "move failed: %d/%d %d/%d", pos.row, LINES-1, pos.col, COLS-1);
 
-	if(refresh() == ERR)
-		err_exit(0, "refresh failed!");
+	/*fprintf(stderr, "\tmove cursor: %d, %d\n", pos.row, pos.col);*/
 
 	return 1;
 }

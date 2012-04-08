@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <locale.h>
 #include <signal.h>
+#include <fcntl.h>
 
 #if defined(__FreeBSD__)
 #	include <libutil.h>
@@ -45,15 +46,28 @@
 #include "screen.h"
 #include "err.h"
 
-static const unsigned int BUF_SIZE = 1024;
+static const int BUF_SIZE = 2048;
 
 /* globals */
 static struct {
 	struct sigaction winch_act, prev_winch_act; /* structs for handing window size change */
 	int master;		/* master pty */
-	int winch;		/* boolean: 1 = winch occured, 0 = no winch */
 	VTerm *vt;		/* libvterm virtual terminal pointer */
 } g; 
+
+static int set_nonblocking(int fd) {
+	int opts;
+
+	opts = fcntl(fd, F_GETFL);
+	if (opts < 0) 
+		return -1;
+
+	opts = (opts | O_NONBLOCK);
+	if (fcntl(fd, F_SETFL, opts) < 0)
+		return -1;
+
+	return 0;
+}
 
 void change_winch(int how) {
 	sigset_t set;
@@ -113,10 +127,10 @@ static void write_n_or_exit(int fd, const void *buf, size_t n) {
 void loop(VTerm *vt, int master) {
 	struct timeval timeout;
 	fd_set in_fds;
-	ssize_t n_read;	
+	ssize_t n_read, total_read;	
 	int ch, buflen;
 	char buf[BUF_SIZE]; /* IO buffer */
-		
+	
 	while(1) {
 		/* most of this process's time is spent waiting for
 		 * select's timeout, so we want to handle all
@@ -129,7 +143,7 @@ void loop(VTerm *vt, int master) {
 		FD_ZERO(&in_fds);
 		FD_SET(STDIN_FILENO, &in_fds);
 		FD_SET(master, &in_fds);
-
+		
 		if(select(master + 1, &in_fds, NULL, NULL, &timeout) == -1) {
 			if(errno == EINTR) 
 				continue;
@@ -138,10 +152,32 @@ void loop(VTerm *vt, int master) {
 		}
 
 		block_winch();
-		
-		while(vterm_output_get_buffer_remaining(vt) > 0 && screen_getch(&ch) == 0 ) {
-			vterm_input_push_char(vt, VTERM_MOD_NONE, (uint32_t) ch);
+
+		if(FD_ISSET(master, &in_fds) ) {
+			total_read = 0;
+			n_read = 0;
+			do {
+				total_read += n_read;
+				/*if(total_read > 0) 
+					fprintf(stderr, "read %d/%d bytes\n", (int) total_read, BUF_SIZE);*/
+				n_read = read(master, buf + total_read, 512);
+			} while(n_read > 0 && (total_read + n_read < BUF_SIZE - 512) );
+			
+			if(n_read == 0) { 
+				return; /* the master pty is closed */
+			}
+			else if(n_read < 0 && errno != EAGAIN) {
+				err_exit(errno, "error reading from pty master");
+			}
+
+			/*fprintf(stderr, "push_bytes: start\n");*/
+			vterm_push_bytes(vt, buf, total_read);
+			/*fprintf(stderr, "push_bytes: stop\n");*/
+			screen_redraw();
 		}
+
+		while(vterm_output_get_buffer_remaining(vt) > 0 && screen_getch(&ch) == 0 )
+			vterm_input_push_char(vt, VTERM_MOD_NONE, (uint32_t) ch);
 
 		buflen = vterm_output_get_buffer_current(vt);
 		if(buflen > 0) {
@@ -149,16 +185,9 @@ void loop(VTerm *vt, int master) {
 			buflen = vterm_output_bufferread(vt, buffer, buflen);
 			write_n_or_exit(master, buffer, buflen);
 		}
+
 		
-		if(FD_ISSET(master, &in_fds) ) {
-			n_read = read(master, buf, BUF_SIZE);
-			if(n_read <= 0)
-				return;
-
-			vterm_push_bytes(vt, buf, n_read);
-		}
 	}
-
 }
 
 void err_exit_cleanup(int error) {
@@ -214,7 +243,7 @@ int main() {
 	vterm_screen_reset(vts);
 
 	vterm_screen_set_callbacks(vts, &screen_cbs, NULL);
-	//vterm_screen_set_damage_merge(vts, VTERM_DAMAGE_SCROLL);
+	/*vterm_screen_set_damage_merge(vts, VTERM_DAMAGE_SCROLL);*/
 
 	if(screen_color_start() != 0) {
 		printf("failed to start color\n");
@@ -229,6 +258,9 @@ int main() {
 		execvp(shell, args);
 		err_exit(errno, "cannot exec %s", shell);
 	}
+
+	if(set_nonblocking(g.master) != 0)
+		err_exit(errno, "failed to set master fd to non-blocking");
 	
 	if(sigaction(SIGWINCH, &g.winch_act, &g.prev_winch_act) != 0)
 		err_exit(errno, "sigaction failed");

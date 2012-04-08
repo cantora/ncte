@@ -40,6 +40,8 @@ int screen_getch(int *ch);
 /*void screen_err_msg(int error, char **msg);*/
 int screen_color_start();
 int screen_damage(VTermRect rect, void *user);
+void screen_redraw();
+void screen_refresh();
 int screen_movecursor(VTermPos pos, VTermPos oldpos, int visible, void *user);
 int screen_bell(void *user);
 int screen_settermprop(VTermProp prop, VTermValue *val, void *user);
