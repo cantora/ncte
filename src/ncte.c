@@ -173,19 +173,21 @@ void loop(VTerm *vt, int master) {
 			/*fprintf(stderr, "push_bytes: start\n");*/
 			vterm_push_bytes(vt, buf, total_read);
 			/*fprintf(stderr, "push_bytes: stop\n");*/
+			screen_refresh();
 			screen_redraw();
 		}
 
-		while(vterm_output_get_buffer_remaining(vt) > 0 && screen_getch(&ch) == 0 )
-			vterm_input_push_char(vt, VTERM_MOD_NONE, (uint32_t) ch);
-
-		buflen = vterm_output_get_buffer_current(vt);
-		if(buflen > 0) {
-			char buffer[buflen];
-			buflen = vterm_output_bufferread(vt, buffer, buflen);
-			write_n_or_exit(master, buffer, buflen);
+		if(FD_ISSET(STDIN_FILENO, &in_fds) ) {
+			while(vterm_output_get_buffer_remaining(vt) > 0 && screen_getch(&ch) == 0 )
+				vterm_input_push_char(vt, VTERM_MOD_NONE, (uint32_t) ch);
+	
+			buflen = vterm_output_get_buffer_current(vt);
+			if(buflen > 0) {
+				char buffer[buflen];
+				buflen = vterm_output_bufferread(vt, buffer, buflen);
+				write_n_or_exit(master, buffer, buflen);
+			}
 		}
-
 		
 	}
 }
