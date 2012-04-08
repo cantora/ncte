@@ -26,6 +26,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/select.h>
+#include <time.h>
 #include <unistd.h>
 #include <locale.h>
 #include <signal.h>
@@ -125,37 +126,44 @@ static void write_n_or_exit(int fd, const void *buf, size_t n) {
 }
 
 void loop(VTerm *vt, int master) {
-	struct timeval timeout;
+	struct timeval select_tv;
+	struct timespec refresh_ts, t_start, t_now;
 	fd_set in_fds;
 	ssize_t n_read, total_read;	
 	int ch, buflen;
 	char buf[BUF_SIZE]; /* IO buffer */
 	
+	refresh_ts.tv_sec = 0;
+	refresh_ts.tv_nsec = 100000000; /* 1/10 of a second */
+	clock_gettime(CLOCK_MONOTONIC, &t_start);
+
 	while(1) {
+		select_tv.tv_sec = 0;
+		select_tv.tv_usec = 100000; /* 1/10 of a second */
+
+		FD_ZERO(&in_fds);
+		FD_SET(STDIN_FILENO, &in_fds);
+		FD_SET(master, &in_fds);
+
+		clock_gettime(CLOCK_MONOTONIC, &t_now);
+		
 		/* most of this process's time is spent waiting for
 		 * select's timeout, so we want to handle all
 		 * SIGWINCH signals here
 		 */
 		unblock_winch(); 
-		timeout.tv_sec = 0;
-		timeout.tv_usec = 100000; /* 1/10 of a second */
-
-		FD_ZERO(&in_fds);
-		FD_SET(STDIN_FILENO, &in_fds);
-		FD_SET(master, &in_fds);
-		
-		if(select(master + 1, &in_fds, NULL, NULL, &timeout) == -1) {
-			if(errno == EINTR) 
+		if(select(master + 1, &in_fds, NULL, NULL, &select_tv) == -1) {
+			if(errno == EINTR) {
+				block_winch();
 				continue;
+			}
 			else
 				err_exit(errno, "select");
 		}
-
 		block_winch();
 
 		if(FD_ISSET(master, &in_fds) ) {
 			total_read = 0;
-			n_read = 0;
 			do {
 				/*if(total_read > 0) 
 					fprintf(stderr, "read %d/%d bytes\n", (int) total_read, BUF_SIZE);*/
