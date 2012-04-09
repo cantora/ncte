@@ -26,6 +26,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/select.h>
+#include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
 #include <locale.h>
@@ -46,6 +47,7 @@
 
 #include "screen.h"
 #include "err.h"
+#include "ts_util.h"
 
 static const int BUF_SIZE = 2048;
 
@@ -126,33 +128,40 @@ static void write_n_or_exit(int fd, const void *buf, size_t n) {
 }
 
 void loop(VTerm *vt, int master) {
-	struct timeval select_tv;
-	struct timespec refresh_ts, t_start, t_now;
+	struct timeval tv_select;
+	struct timespec ts_refresh, ts_start, ts_now, ts_diff;
 	fd_set in_fds;
 	ssize_t n_read, total_read;	
 	int ch, buflen;
 	char buf[BUF_SIZE]; /* IO buffer */
 	
-	refresh_ts.tv_sec = 0;
-	refresh_ts.tv_nsec = 100000000; /* 1/10 of a second */
-	clock_gettime(CLOCK_MONOTONIC, &t_start);
+	ts_refresh.tv_sec = 0;
+	ts_refresh.tv_nsec = 50000000; 
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
 
 	while(1) {
-		select_tv.tv_sec = 0;
-		select_tv.tv_usec = 100000; /* 1/10 of a second */
+		tv_select.tv_sec = 0;
+		//tv_select.tv_usec = 100000; /* 1/10 of a second */
+		tv_select.tv_usec = 100; /* 1/10 of a second */
 
 		FD_ZERO(&in_fds);
 		FD_SET(STDIN_FILENO, &in_fds);
 		FD_SET(master, &in_fds);
 
-		clock_gettime(CLOCK_MONOTONIC, &t_now);
+		clock_gettime(CLOCK_MONOTONIC, &ts_now);
+		if(ts_compare(ts_subtract(ts_now, ts_start), ts_refresh) == 1) {
+			screen_refresh();
+			screen_redraw();
+
+			clock_gettime(CLOCK_MONOTONIC, &ts_start);
+		}		
 		
 		/* most of this process's time is spent waiting for
 		 * select's timeout, so we want to handle all
 		 * SIGWINCH signals here
 		 */
 		unblock_winch(); 
-		if(select(master + 1, &in_fds, NULL, NULL, &select_tv) == -1) {
+		if(select(master + 1, &in_fds, NULL, NULL, &tv_select) == -1) {
 			if(errno == EINTR) {
 				block_winch();
 				continue;
@@ -180,8 +189,7 @@ void loop(VTerm *vt, int master) {
 			/*fprintf(stderr, "push_bytes: start\n");*/
 			vterm_push_bytes(vt, buf, total_read);
 			/*fprintf(stderr, "push_bytes: stop\n");*/
-			screen_refresh();
-			screen_redraw();
+			
 		}
 
 		if(FD_ISSET(STDIN_FILENO, &in_fds) ) {
