@@ -137,14 +137,12 @@ void loop(VTerm *vt, int master) {
 		 * SIGWINCH signals here
 		 */
 		unblock_winch(); 
-		timeout.tv_sec = 0;
-		timeout.tv_usec = 100000; /* 1/10 of a second */
 
 		FD_ZERO(&in_fds);
 		FD_SET(STDIN_FILENO, &in_fds);
 		FD_SET(master, &in_fds);
 		
-		if(select(master + 1, &in_fds, NULL, NULL, &timeout) == -1) {
+		if(select(master + 1, &in_fds, NULL, NULL, NULL) == -1) {
 			if(errno == EINTR) 
 				continue;
 			else
