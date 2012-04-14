@@ -15,32 +15,17 @@
  * You should have received a copy of the GNU General Public License
  * along with ncte.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "timer.h"
+#ifndef NCTE_TIMER_H
+#define NCTE_TIMER_H
 
-int timer_init(struct timer_t *timer) {
-	if(gettimeofday(&timer->start, NULL) != 0)
-		return -1;
+#include <sys/time.h>
+#include <time.h>
 
-	return 0;
-}
+struct timer_t {
+	struct timeval start;
+};
 
-/* return 1 if the elapsed time is greater
- * than or equal to sec*1,000,000 + usec 
- * microseconds and return 0 otherwise.
- * returns -1 on error with errno set.
- */
-int timer_thresh(struct timer_t *timer, int sec, int usec) {
-	struct timeval now, diff, amt;
-	amt.tv_sec = sec;
-	amt.tv_usec = usec;
+int timer_init(struct timer_t *timer);
+int timer_thresh(struct timer_t *timer, int sec, int usec);
 
-	if(gettimeofday(&now, NULL) != 0)
-		return -1;
-
-	timersub(&now, &timer->start, &diff);
-	if(!timercmp(&diff, &amt, <) )
-		return 1;
-	
-	return 0;
-}
-
+#endif /* NCTE_TIMER_H */

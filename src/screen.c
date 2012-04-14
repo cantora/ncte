@@ -298,7 +298,7 @@ static void update_cell(VTermScreen *vts, VTermPos pos) {
 	VTermScreenCell cell;
 	attr_t attr;
 	short pair;
-	cchar_t cch;
+	cchar_t cch, cur_cch;
 	wchar_t *wch;
 	wchar_t erasech = L' ';
 	int maxx, maxy;
@@ -322,10 +322,31 @@ static void update_cell(VTermScreen *vts, VTermPos pos) {
 
 	if(move(pos.row, pos.col) == ERR)
 		err_exit(0, "move failed: %d/%d, %d/%d\n", pos.row, maxy-1, pos.col, maxx-1);
-	
+
+	/*if(in_wch(&cur_cch) == ERR)
+		err_exit(0, "in_wch failed");
+	if(cch.attr == cur_cch.attr && wmemcmp(cch.chars, cur_cch.chars, CCHARW_MAX) == 0) {
+		fprintf(stderr, "cur was same\n");
+		return;
+	}*/
+
 	if(add_wch(&cch) == ERR && pos.row != (maxy-1) && pos.col != (maxx-1) )
 		err_exit(0, "add_wch failed at %d/%d, %d/%d: ", pos.row, maxy-1, pos.col, maxx-1);
 
+	/*if(wnoutrefresh(stdscr) == ERR)
+		err_exit(0, "wnoutrefresh failed");*/
+}
+
+void screen_damage_win() {
+	VTermRect win = {
+		.start_row = 0,
+		.start_col = 0,
+		.end_row = 0,
+		.end_col = 0
+	};
+
+	screen_dims((unsigned short *) &win.end_row, (unsigned short *) &win.end_col);
+	screen_damage(win, NULL);
 }
 
 void screen_redraw() {
@@ -334,6 +355,8 @@ void screen_redraw() {
 }
 
 void screen_refresh() {
+	/*if(doupdate() == ERR) 
+		err_exit(0, "doupdate failed");	*/
 	if(refresh() == ERR)
 		err_exit(0, "refresh failed!");
 }
@@ -395,9 +418,9 @@ int screen_movecursor(VTermPos pos, VTermPos oldpos, int visible, void *user) {
 int screen_bell(void *user) {
 	(void)(user);
 
-	if(beep() == ERR) {
+	/*if(beep() == ERR) {
 		fprintf(stderr, "bell failed\n");
-	}
+	}*/
 
 	/*if(flash() == ERR) {
 		fprintf(stderr, "flash failed\n");

@@ -47,6 +47,7 @@
 
 #include "screen.h"
 #include "err.h"
+#include "timer.h"
 
 static const int BUF_SIZE = 2048*4;
 
@@ -129,29 +130,25 @@ static void write_n_or_exit(int fd, const void *buf, size_t n) {
 void loop(VTerm *vt, int master) {
 	fd_set in_fds;
 	ssize_t n_read, total_read;	
-	int ch, buflen;
+	int ch, buflen, status, force_refresh;
 	char buf[BUF_SIZE]; /* IO buffer */
-	
+	struct timer_t timer;
+	struct timeval tv_select;
+
+	timer_init(&timer);
 	while(1) {
-	
 		FD_ZERO(&in_fds);
 		FD_SET(STDIN_FILENO, &in_fds);
 		FD_SET(master, &in_fds);
+		tv_select.tv_sec = 0;
+		tv_select.tv_usec = 5000;
 
-		/*clock_gettime(CLOCK_MONOTONIC, &ts_now);
-		if(ts_compare(ts_subtract(ts_now, ts_start), ts_refresh) == 1) {
-			screen_refresh();
-			screen_redraw();
-
-			clock_gettime(CLOCK_MONOTONIC, &ts_start);
-		}*/		
-		
 		/* most of this process's time is spent waiting for
 		 * select's timeout, so we want to handle all
 		 * SIGWINCH signals here
 		 */
 		unblock_winch(); 
-		if(select(master + 1, &in_fds, NULL, NULL, NULL) == -1) {
+		if(select(master + 1, &in_fds, NULL, NULL, &tv_select) == -1) {
 			if(errno == EINTR) {
 				block_winch();
 				continue;
@@ -179,13 +176,30 @@ void loop(VTerm *vt, int master) {
 			/*fprintf(stderr, "push_bytes: start\n");*/
 			vterm_push_bytes(vt, buf, total_read);
 			/*fprintf(stderr, "push_bytes: stop\n");*/
-			screen_refresh();
-			screen_redraw();
+			timer_init(&timer);
 		}
 
+		if(force_refresh == 1 || (status = timer_thresh(&timer, 0, 10000) ) ) {
+			screen_damage_win();
+			screen_refresh();
+			//screen_redraw();
+			timer_init(&timer);
+			force_refresh = 0;
+		}
+		else if(status < 0)
+			err_exit(errno, "timer error");
+
 		if(FD_ISSET(STDIN_FILENO, &in_fds) ) {
-			while(vterm_output_get_buffer_remaining(vt) > 0 && screen_getch(&ch) == 0 )
+			while(vterm_output_get_buffer_remaining(vt) > 0 && screen_getch(&ch) == 0 ) {
+				if(ch == 0x12) {
+					//screen_damage_win();
+					//screen_refresh();
+					screen_redraw();
+					continue;
+				}
+					
 				vterm_input_push_char(vt, VTERM_MOD_NONE, (uint32_t) ch);
+			}
 	
 			buflen = vterm_output_get_buffer_current(vt);
 			if(buflen > 0) {
@@ -193,8 +207,9 @@ void loop(VTerm *vt, int master) {
 				buflen = vterm_output_bufferread(vt, buffer, buflen);
 				write_n_or_exit(master, buffer, buflen);
 			}
+
+			force_refresh = 1;
 		}
-		
 	}
 }
 
@@ -221,7 +236,7 @@ int main() {
 	g.winch_act.sa_flags = 0;
 
 	VTermScreenCallbacks screen_cbs = {
-		.damage = screen_damage,
+		//.damage = screen_damage,
 		.movecursor = screen_movecursor,
 		.bell = screen_bell,
 		.settermprop = screen_settermprop
