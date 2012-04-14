@@ -18,23 +18,34 @@
 #include <sys/time.h>
 #include <time.h>
 
-#include "ts_util.h"
-
-typedef struct timer_t {
-	struct timespec start;
+struct timer_t {
+	struct timeval start;
 };
 
-void timer_init(timer_t *timer) {
-	clock_gettime(CLOCK_MONOTONIC, &timer->start);
+int timer_init(struct timer_t *timer) {
+	if(gettimeofday(&timer->start, NULL) != 0)
+		return -1;
+
+	return 0;
 }
 
-void timer_cmp(timer_t *timer, uint32_t sec, uint32_t nsec) {
-	timespec ts_amt, ts_now;
+/* return 1 if the elapsed time is greater
+ * than or equal to sec*1,000,000 + usec 
+ * microseconds and return 0 otherwise.
+ * returns -1 on error with errno set.
+ */
+int timer_thresh(struct timer_t *timer, int sec, int usec) {
+	struct timeval now, diff, amt;
+	amt.tv_sec = sec;
+	amt.tv_usec = usec;
 
-	ts_amt.tv_sec = sec;
-	ts_amt.tv_nsec = nsec;
+	if(gettimeofday(&now, NULL) != 0)
+		return -1;
 
-	clock_gettime(CLOCK_MONOTONIC, &ts_now);
-	return ts_compare(ts_subtract(ts_now, timer->start), ts_amt);
+	timersub(&now, &timer->start, &diff);
+	if(!timercmp(&diff, &amt, <) )
+		return 1;
+	
+	return 0;
 }
 

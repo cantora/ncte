@@ -1,11 +1,11 @@
 .SECONDARY:
 
-DEFINES			= -D_XOPEN_SOURCE -D_XOPEN_SOURCE_EXTENDED=1 -D_POSIX_C_SOURCE=	199309L
+DEFINES			= -D_XOPEN_SOURCE -D_XOPEN_SOURCE_EXTENDED=1 #-D_POSIX_C_SOURCE=199309L
 OUTPUT			= ncte
 BUILD			= ./build
 MKBUILD			:= $(shell mkdir -p $(BUILD) )
 LIBVTERM		= ./libvterm/.libs/libvterm.a
-LIB 			= -lutil -lrt -lncursesw $(LIBVTERM)
+LIB 			= -lutil -lncursesw $(LIBVTERM) #-lrt
 INCLUDES		= -iquote"./libvterm/include" -iquote"./libvterm/src" -iquote"./src"
 CXX_FLAGS		= -ggdb -Wall -Wextra $(INCLUDES) $(DEFINES)
 CXX_CMD			= gcc $(CXX_FLAGS)
