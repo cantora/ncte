@@ -132,10 +132,11 @@ void loop(VTerm *vt, int master) {
 	ssize_t n_read, total_read;	
 	int ch, buflen, status, force_refresh;
 	char buf[BUF_SIZE]; /* IO buffer */
-	struct timer_t timer;
+	struct timer_t inter_io_timer, refresh_expire;
 	struct timeval tv_select;
 
-	timer_init(&timer);
+	timer_init(&inter_io_timer);
+	timer_init(&refresh_expire);
 	while(1) {
 		FD_ZERO(&in_fds);
 		FD_SET(STDIN_FILENO, &in_fds);
@@ -176,13 +177,19 @@ void loop(VTerm *vt, int master) {
 			/*fprintf(stderr, "push_bytes: start\n");*/
 			vterm_push_bytes(vt, buf, total_read);
 			/*fprintf(stderr, "push_bytes: stop\n");*/
-			timer_init(&timer);
+			timer_init(&inter_io_timer);
 		}
 
-		if(force_refresh == 1 || (status = timer_thresh(&timer, 0, 10000) ) ) {
+		if( status = timer_thresh(&refresh_expire, 0, 500000) ) {
+			force_refresh = 1;
+		}
+		else if(status < 0)
+			err_exit(errno, "timer error");
+		
+		if(force_refresh == 1 || (status = timer_thresh(&inter_io_timer, 0, 10000) ) ) {
 			screen_damage_win();
 			screen_refresh();
-			timer_init(&timer);
+			timer_init(&inter_io_timer);
 			force_refresh = 0;
 		}
 		else if(status < 0)
