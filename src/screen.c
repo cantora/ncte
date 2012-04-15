@@ -145,9 +145,11 @@ int screen_color_start() {
 		goto fail;
 	}
 
+	/* for some reason we can just use pairs above 63 and its fine... */
 	if(COLOR_PAIRS < SCN_REQ_PAIRS) {
-		errno = SCN_ERR_COLOR_PAIRS;
-		goto fail;
+		/*errno = SCN_ERR_COLOR_PAIRS;
+		goto fail;*/
+		fprintf(stderr, "warning: your terminal may not support 81 color pairs. if problems arise, try setting TERM to 'xterm-256color'\n");
 	}
 
 	for(i = 0; i < SCN_REQ_COLORS; i++) {
@@ -298,7 +300,7 @@ static void update_cell(VTermScreen *vts, VTermPos pos) {
 	VTermScreenCell cell;
 	attr_t attr;
 	short pair;
-	cchar_t cch, cur_cch;
+	cchar_t cch;
 	wchar_t *wch;
 	wchar_t erasech = L' ';
 	int maxx, maxy;
@@ -333,8 +335,6 @@ static void update_cell(VTermScreen *vts, VTermPos pos) {
 	if(add_wch(&cch) == ERR && pos.row != (maxy-1) && pos.col != (maxx-1) )
 		err_exit(0, "add_wch failed at %d/%d, %d/%d: ", pos.row, maxy-1, pos.col, maxx-1);
 
-	/*if(wnoutrefresh(stdscr) == ERR)
-		err_exit(0, "wnoutrefresh failed");*/
 }
 
 void screen_damage_win() {
@@ -355,8 +355,6 @@ void screen_redraw() {
 }
 
 void screen_refresh() {
-	/*if(doupdate() == ERR) 
-		err_exit(0, "doupdate failed");	*/
 	if(refresh() == ERR)
 		err_exit(0, "refresh failed!");
 }
@@ -418,9 +416,9 @@ int screen_movecursor(VTermPos pos, VTermPos oldpos, int visible, void *user) {
 int screen_bell(void *user) {
 	(void)(user);
 
-	/*if(beep() == ERR) {
+	if(beep() == ERR) {
 		fprintf(stderr, "bell failed\n");
-	}*/
+	}
 
 	/*if(flash() == ERR) {
 		fprintf(stderr, "flash failed\n");

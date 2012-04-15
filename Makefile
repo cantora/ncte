@@ -1,6 +1,6 @@
 .SECONDARY:
 
-DEFINES			= -D_XOPEN_SOURCE -D_XOPEN_SOURCE_EXTENDED=1 #-D_POSIX_C_SOURCE=199309L
+DEFINES			= -D_XOPEN_SOURCE -D_XOPEN_SOURCE_EXTENDED=1 -D_BSD_SOURCE #-D_POSIX_C_SOURCE=199309L
 OUTPUT			= ncte
 BUILD			= ./build
 MKBUILD			:= $(shell mkdir -p $(BUILD) )
@@ -12,6 +12,10 @@ CXX_CMD			= gcc $(CXX_FLAGS)
 
 SRCS			= $(notdir $(filter-out ./src/$(OUTPUT).c, $(wildcard ./src/*.c) ) $(BUILD)/vterm_ansi_colors.c )
 OBJECTS			= $(patsubst %.c, $(BUILD)/%.o, $(SRCS) ) 
+
+#TESTS 			= $(notdir $(patsubst %.c, %, $(wildcard ./test/*.c) ) )
+#TEST_OUTPUTS	= $(foreach test, $(TESTS), $(BUILD)/$(test))
+#TEST_OBJECTS	= $(OBJECTS)
 
 default: all
 
@@ -49,6 +53,20 @@ $(BUILD)/%.o: ./src/%.c
 
 $(BUILD)/%.o: ./src/%.c ./src/%.h
 	$(CXX_CMD) -c $< -o $@
+
+#$(BUILD)/%.o: ./test/%.c
+#	$(CXX_CMD) -c $< -o $@
+
+#define test-template
+#$$(BUILD)/$(1): $$(BUILD)/$(1).o $$(TEST_OBJECTS)
+#	$(CXX_CMD) $$+ $$(LIB) -o $$@
+#
+#$(1): $$(BUILD)/$(1) 
+#	$(BUILD)/$(1)
+#endef
+
+#.PHONY: $(TESTS) 
+#$(foreach test, $(TESTS), $(eval $(call test-template,$(test)) ) )
 
 .PHONY: clean 
 clean: 

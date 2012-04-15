@@ -18,8 +18,8 @@
 #ifndef NCTE_TIMER_H
 #define NCTE_TIMER_H
 
-#include <sys/time.h>
 #include <time.h>
+#include <sys/time.h>
 
 struct timer_t {
 	struct timeval start;

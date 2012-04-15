@@ -182,7 +182,6 @@ void loop(VTerm *vt, int master) {
 		if(force_refresh == 1 || (status = timer_thresh(&timer, 0, 10000) ) ) {
 			screen_damage_win();
 			screen_refresh();
-			//screen_redraw();
 			timer_init(&timer);
 			force_refresh = 0;
 		}
@@ -191,13 +190,6 @@ void loop(VTerm *vt, int master) {
 
 		if(FD_ISSET(STDIN_FILENO, &in_fds) ) {
 			while(vterm_output_get_buffer_remaining(vt) > 0 && screen_getch(&ch) == 0 ) {
-				if(ch == 0x12) {
-					//screen_damage_win();
-					//screen_refresh();
-					screen_redraw();
-					continue;
-				}
-					
 				vterm_input_push_char(vt, VTERM_MOD_NONE, (uint32_t) ch);
 			}
 	
@@ -247,8 +239,7 @@ int main() {
 	}
 	
 	setlocale(LC_ALL,"");
-
-	putenv("TERM=xterm-256color");
+	putenv("TERM=screen");
 	if(screen_init() != 0)
 		err_exit(0, "screen_init failure");
 
