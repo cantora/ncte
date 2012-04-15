@@ -190,6 +190,7 @@ void loop(VTerm *vt, int master) {
 			screen_damage_win();
 			screen_refresh();
 			timer_init(&inter_io_timer);
+			timer_init(&refresh_expire);
 			force_refresh = 0;
 		}
 		else if(status < 0)
