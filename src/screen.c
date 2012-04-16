@@ -145,9 +145,11 @@ int screen_color_start() {
 		goto fail;
 	}
 
+	/* for some reason we can just use pairs above 63 and its fine... */
 	if(COLOR_PAIRS < SCN_REQ_PAIRS) {
-		errno = SCN_ERR_COLOR_PAIRS;
-		goto fail;
+		/*errno = SCN_ERR_COLOR_PAIRS;
+		goto fail;*/
+		fprintf(stderr, "warning: your terminal may not support 81 color pairs. if problems arise, try setting TERM to 'xterm-256color'\n");
 	}
 
 	for(i = 0; i < SCN_REQ_COLORS; i++) {
@@ -322,10 +324,29 @@ static void update_cell(VTermScreen *vts, VTermPos pos) {
 
 	if(move(pos.row, pos.col) == ERR)
 		err_exit(0, "move failed: %d/%d, %d/%d\n", pos.row, maxy-1, pos.col, maxx-1);
-	
+
+	/*if(in_wch(&cur_cch) == ERR)
+		err_exit(0, "in_wch failed");
+	if(cch.attr == cur_cch.attr && wmemcmp(cch.chars, cur_cch.chars, CCHARW_MAX) == 0) {
+		fprintf(stderr, "cur was same\n");
+		return;
+	}*/
+
 	if(add_wch(&cch) == ERR && pos.row != (maxy-1) && pos.col != (maxx-1) )
 		err_exit(0, "add_wch failed at %d/%d, %d/%d: ", pos.row, maxy-1, pos.col, maxx-1);
 
+}
+
+void screen_damage_win() {
+	VTermRect win = {
+		.start_row = 0,
+		.start_col = 0,
+		.end_row = 0,
+		.end_col = 0
+	};
+
+	screen_dims((unsigned short *) &win.end_row, (unsigned short *) &win.end_col);
+	screen_damage(win, NULL);
 }
 
 void screen_redraw() {

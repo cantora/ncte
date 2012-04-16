@@ -26,6 +26,8 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/select.h>
+#include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
 #include <locale.h>
 #include <signal.h>
@@ -45,8 +47,9 @@
 
 #include "screen.h"
 #include "err.h"
+#include "timer.h"
 
-static const int BUF_SIZE = 2048;
+static const int BUF_SIZE = 2048*4;
 
 /* globals */
 static struct {
@@ -125,35 +128,39 @@ static void write_n_or_exit(int fd, const void *buf, size_t n) {
 }
 
 void loop(VTerm *vt, int master) {
-	struct timeval timeout;
 	fd_set in_fds;
 	ssize_t n_read, total_read;	
-	int ch, buflen;
+	int ch, buflen, status, force_refresh;
 	char buf[BUF_SIZE]; /* IO buffer */
-	
+	struct timer_t inter_io_timer, refresh_expire;
+	struct timeval tv_select;
+
+	timer_init(&inter_io_timer);
+	timer_init(&refresh_expire);
 	while(1) {
+		FD_ZERO(&in_fds);
+		FD_SET(STDIN_FILENO, &in_fds);
+		FD_SET(master, &in_fds);
+		tv_select.tv_sec = 0;
+		tv_select.tv_usec = 5000;
+
 		/* most of this process's time is spent waiting for
 		 * select's timeout, so we want to handle all
 		 * SIGWINCH signals here
 		 */
 		unblock_winch(); 
-
-		FD_ZERO(&in_fds);
-		FD_SET(STDIN_FILENO, &in_fds);
-		FD_SET(master, &in_fds);
-		
-		if(select(master + 1, &in_fds, NULL, NULL, NULL) == -1) {
-			if(errno == EINTR) 
+		if(select(master + 1, &in_fds, NULL, NULL, &tv_select) == -1) {
+			if(errno == EINTR) {
+				block_winch();
 				continue;
+			}
 			else
 				err_exit(errno, "select");
 		}
-
 		block_winch();
 
 		if(FD_ISSET(master, &in_fds) ) {
 			total_read = 0;
-			n_read = 0;
 			do {
 				/*if(total_read > 0) 
 					fprintf(stderr, "read %d/%d bytes\n", (int) total_read, BUF_SIZE);*/
@@ -170,13 +177,29 @@ void loop(VTerm *vt, int master) {
 			/*fprintf(stderr, "push_bytes: start\n");*/
 			vterm_push_bytes(vt, buf, total_read);
 			/*fprintf(stderr, "push_bytes: stop\n");*/
-			screen_refresh();
-			screen_redraw();
+			timer_init(&inter_io_timer);
 		}
 
+		if( status = timer_thresh(&refresh_expire, 0, 500000) ) {
+			force_refresh = 1;
+		}
+		else if(status < 0)
+			err_exit(errno, "timer error");
+		
+		if(force_refresh == 1 || (status = timer_thresh(&inter_io_timer, 0, 10000) ) ) {
+			screen_damage_win();
+			screen_refresh();
+			timer_init(&inter_io_timer);
+			timer_init(&refresh_expire);
+			force_refresh = 0;
+		}
+		else if(status < 0)
+			err_exit(errno, "timer error");
+
 		if(FD_ISSET(STDIN_FILENO, &in_fds) ) {
-			while(vterm_output_get_buffer_remaining(vt) > 0 && screen_getch(&ch) == 0 )
+			while(vterm_output_get_buffer_remaining(vt) > 0 && screen_getch(&ch) == 0 ) {
 				vterm_input_push_char(vt, VTERM_MOD_NONE, (uint32_t) ch);
+			}
 	
 			buflen = vterm_output_get_buffer_current(vt);
 			if(buflen > 0) {
@@ -184,8 +207,9 @@ void loop(VTerm *vt, int master) {
 				buflen = vterm_output_bufferread(vt, buffer, buflen);
 				write_n_or_exit(master, buffer, buflen);
 			}
+
+			force_refresh = 1;
 		}
-		
 	}
 }
 
@@ -212,7 +236,7 @@ int main() {
 	g.winch_act.sa_flags = 0;
 
 	VTermScreenCallbacks screen_cbs = {
-		.damage = screen_damage,
+		//.damage = screen_damage,
 		.movecursor = screen_movecursor,
 		.bell = screen_bell,
 		.settermprop = screen_settermprop
@@ -223,8 +247,7 @@ int main() {
 	}
 	
 	setlocale(LC_ALL,"");
-
-	putenv("TERM=xterm-256color");
+	putenv("TERM=screen");
 	if(screen_init() != 0)
 		err_exit(0, "screen_init failure");
 
