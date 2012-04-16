@@ -45,7 +45,7 @@ void err_exit(int error, const char *format, ...) {
 	if(result >= 0) {
 		fwrite(buf, sizeof(char), result, stdout);
 		if(error != 0) 
-			fprintf(stdout, ": %s", strerror(error) );
+			fprintf(stdout, ": %s (%d)", strerror(error), error );
 		
 		fputc('\n', stdout);
 	}

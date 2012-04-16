@@ -49,13 +49,14 @@
 #include "err.h"
 #include "timer.h"
 
-static const int BUF_SIZE = 2048*4;
+#define BUF_SIZE 2048*4
 
 /* globals */
 static struct {
 	struct sigaction winch_act, prev_winch_act; /* structs for handing window size change */
 	int master;		/* master pty */
 	VTerm *vt;		/* libvterm virtual terminal pointer */
+	char buf[BUF_SIZE]; /* IO buffer */
 } g; 
 
 static int set_nonblocking(int fd) {
@@ -127,11 +128,46 @@ static void write_n_or_exit(int fd, const void *buf, size_t n) {
 	}
 }
 
+static void process_input(VTerm *vt, int master) {
+	int ch;
+	size_t buflen;
+
+	while(vterm_output_get_buffer_remaining(vt) > 0 && screen_getch(&ch) == 0 ) {
+		vterm_input_push_char(vt, VTERM_MOD_NONE, (uint32_t) ch);
+	}
+	
+	buflen = vterm_output_get_buffer_current(vt);
+	if(buflen > 0) {
+		buflen = (buflen < BUF_SIZE)? buflen : BUF_SIZE;
+		buflen = vterm_output_bufferread(vt, g.buf, buflen);
+		write_n_or_exit(master, g.buf, buflen);
+	}
+}
+
+static int process_output(VTerm *vt, int master) {
+	ssize_t n_read, total_read;
+
+	total_read = 0;
+	do {
+		n_read = read(master, g.buf + total_read, 512);
+	} while(n_read > 0 && ( (total_read += n_read) + 512 <= BUF_SIZE) );
+	
+	if(n_read == 0 || (n_read < 0 && errno == EIO) ) { 
+		return -1; /* the master pty is closed, return -1 to signify */
+	}
+	else if(n_read < 0 && errno != EAGAIN) {
+		err_exit(errno, "error reading from pty master (n_read = %d)", n_read);
+	}
+
+	vterm_push_bytes(vt, g.buf, total_read);
+	
+	return 0;
+}
+
 void loop(VTerm *vt, int master) {
 	fd_set in_fds;
-	ssize_t n_read, total_read;	
-	int ch, buflen, status, force_refresh;
-	char buf[BUF_SIZE]; /* IO buffer */
+	int status, force_refresh;
+
 	struct timer_t inter_io_timer, refresh_expire;
 	struct timeval tv_select;
 
@@ -160,27 +196,13 @@ void loop(VTerm *vt, int master) {
 		block_winch();
 
 		if(FD_ISSET(master, &in_fds) ) {
-			total_read = 0;
-			do {
-				/*if(total_read > 0) 
-					fprintf(stderr, "read %d/%d bytes\n", (int) total_read, BUF_SIZE);*/
-				n_read = read(master, buf + total_read, 512);
-			} while(n_read > 0 && ( (total_read += n_read) + 512 <= BUF_SIZE) );
-			
-			if(n_read == 0) { 
-				return; /* the master pty is closed */
-			}
-			else if(n_read < 0 && errno != EAGAIN) {
-				err_exit(errno, "error reading from pty master");
-			}
+			if(process_output(vt, master) != 0)
+				return;
 
-			/*fprintf(stderr, "push_bytes: start\n");*/
-			vterm_push_bytes(vt, buf, total_read);
-			/*fprintf(stderr, "push_bytes: stop\n");*/
 			timer_init(&inter_io_timer);
 		}
 
-		if( status = timer_thresh(&refresh_expire, 0, 500000) ) {
+		if( (status = timer_thresh(&refresh_expire, 0, 500000)) ) {
 			force_refresh = 1;
 		}
 		else if(status < 0)
@@ -197,16 +219,7 @@ void loop(VTerm *vt, int master) {
 			err_exit(errno, "timer error");
 
 		if(FD_ISSET(STDIN_FILENO, &in_fds) ) {
-			while(vterm_output_get_buffer_remaining(vt) > 0 && screen_getch(&ch) == 0 ) {
-				vterm_input_push_char(vt, VTERM_MOD_NONE, (uint32_t) ch);
-			}
-	
-			buflen = vterm_output_get_buffer_current(vt);
-			if(buflen > 0) {
-				char buffer[buflen];
-				buflen = vterm_output_bufferread(vt, buffer, buflen);
-				write_n_or_exit(master, buffer, buflen);
-			}
+			process_input(vt, master);
 
 			force_refresh = 1;
 		}
@@ -223,7 +236,9 @@ int main() {
 	VTermScreen *vts;
 	pid_t child;
 	struct winsize size;
-	
+	char *shell;
+	char *args[2];
+		
 	/* block winch right off the bat
 	 * because we want to defer 
 	 * processing of it until 
@@ -274,8 +289,12 @@ int main() {
 
 	child = forkpty(&g.master, NULL, NULL, &size);
 	if(child == 0) {
-		char *shell = getenv("SHELL");
-		char *args[2] = { shell, NULL };
+		shell = getenv("SHELL");
+		if(shell == NULL)
+			shell = "/bin/sh"; /* most likely? */
+
+		args[0] = shell;
+		args[1] = NULL;
 		unblock_winch();
 		execvp(shell, args);
 		err_exit(errno, "cannot exec %s", shell);
