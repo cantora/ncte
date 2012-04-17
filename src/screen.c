@@ -61,7 +61,9 @@ int screen_init() {
 		goto fail;
 	if(keypad(stdscr, false) == ERR) /* libvterm interprets keys for us */
 		goto fail;
-	
+	if(nonl() == ERR) 
+		goto fail;
+
 	return 0;
 fail:
 	errno = SCN_ERR_INIT;
