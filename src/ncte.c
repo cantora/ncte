@@ -262,7 +262,11 @@ int main() {
 	}
 	
 	setlocale(LC_ALL,"");
-	//putenv("TERM=screen");
+
+	/* using this terminal profile prevents weird scrolling issues,
+	 * but also causes weird color problems sometimes.
+	 */
+	putenv("TERM=screen"); 
 	if(screen_init() != 0)
 		err_exit(0, "screen_init failure");
 

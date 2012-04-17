@@ -327,6 +327,9 @@ static void update_cell(VTermScreen *vts, VTermPos pos) {
 	if(setcchar(&cch, wch, attr, pair, NULL) == ERR)
 		err_exit(0, "setcchar failed");
 
+	/* OMGROFLITZBAKWRDZ */
+	pos.col = maxx - 1 - pos.col;
+
 	if(move(pos.row, pos.col) == ERR)
 		err_exit(0, "move failed: %d/%d, %d/%d\n", pos.row, maxy-1, pos.col, maxx-1);
 
@@ -409,6 +412,9 @@ int screen_movecursor(VTermPos pos, VTermPos oldpos, int visible, void *user) {
 		fprintf(stderr, "tried to move cursor out of bounds to %d/%d %d/%d\n", pos.row, LINES-1, pos.col, COLS-1);
 		return 1;
 	}
+
+	/* OMGROFLITZBAKWRDZ */
+	pos.col = COLS - 1 - pos.col;
 
 	if(move(pos.row, pos.col) == ERR)
 		err_exit(0, "move failed: %d/%d %d/%d", pos.row, LINES-1, pos.col, COLS-1);
