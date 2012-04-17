@@ -254,7 +254,7 @@ static void to_nearest_curses_color(VTermColor color, short *curs_color, short *
 	min_dist_sq = vterm_color_dist_sq(&color, &vterm_ansi_colors[0]);
 	min_index = 0;
 	for(i = 1; i < SCN_TOTAL_ANSI_COLORS; i++) {
-		dist_sq = vterm_color_dist_sq(&color, &vterm_ansi_colors[0]);
+		dist_sq = vterm_color_dist_sq(&color, &vterm_ansi_colors[i]);
 		if(dist_sq <= min_dist_sq) {
 			min_dist_sq = dist_sq;
 			min_index = i;
@@ -267,11 +267,14 @@ static void to_nearest_curses_color(VTermColor color, short *curs_color, short *
 static void to_curses_pair(VTermColor fg, VTermColor bg, attr_t *attr, short *pair) {
 	short curs_fg, curs_bg, bright_fg, bright_bg;
 	
-	if(to_curses_color(fg, &curs_fg, &bright_fg) != 0) 
+	if(to_curses_color(fg, &curs_fg, &bright_fg) != 0) {
 		to_nearest_curses_color(fg, &curs_fg, &bright_fg);
-
-	if(to_curses_color(bg, &curs_bg, &bright_bg) != 0) 
+		fprintf(stderr, "to_curses_pair: mapped fg color %d,%d,%d to color %d\n", fg.red, fg.green, fg.blue, curs_fg);
+	}
+	if(to_curses_color(bg, &curs_bg, &bright_bg) != 0) {
 		to_nearest_curses_color(bg, &curs_bg, &bright_bg);
+		fprintf(stderr, "to_curses_pair: mapped bg color %d,%d,%d to color %d\n", bg.red, bg.green, bg.blue, curs_bg);
+	}
 	
 	*pair = SCN_REQ_COLORS*curs_fg + curs_bg;
 
