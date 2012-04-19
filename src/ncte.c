@@ -135,9 +135,8 @@ static void process_input(VTerm *vt, int master) {
 	while(vterm_output_get_buffer_remaining(vt) > 0 && screen_getch(&ch) == 0 ) {
 		vterm_input_push_char(vt, VTERM_MOD_NONE, (uint32_t) ch);
 	}
-	
-	buflen = vterm_output_get_buffer_current(vt);
-	if(buflen > 0) {
+		
+	while( (buflen = vterm_output_get_buffer_current(vt) ) > 0) {
 		buflen = (buflen < BUF_SIZE)? buflen : BUF_SIZE;
 		buflen = vterm_output_bufferread(vt, g.buf, buflen);
 		write_n_or_exit(master, g.buf, buflen);
@@ -166,26 +165,38 @@ static int process_output(VTerm *vt, int master) {
 
 void loop(VTerm *vt, int master) {
 	fd_set in_fds;
-	int status, force_refresh;
+	int status, force_refresh, just_refreshed;
 
 	struct timer_t inter_io_timer, refresh_expire;
 	struct timeval tv_select;
+	struct timeval *tv_select_p;
 
 	timer_init(&inter_io_timer);
 	timer_init(&refresh_expire);
+	/* dont initially need to worry about inter_io_timer's need to timeout */
+	just_refreshed = 1;
+
 	while(1) {
 		FD_ZERO(&in_fds);
 		FD_SET(STDIN_FILENO, &in_fds);
 		FD_SET(master, &in_fds);
+
+		/* if we just refreshed the screen there
+		 * is no need to timeout the select wait. 
+		 * however if we havent refreshed on the last
+		 * iteration we need to make sure that inter_io_timer
+		 * is given a chance to timeout and cause a refresh.
+		 */
 		tv_select.tv_sec = 0;
 		tv_select.tv_usec = 5000;
+		tv_select_p = (just_refreshed == 0)? &tv_select : NULL;
 
 		/* most of this process's time is spent waiting for
 		 * select's timeout, so we want to handle all
 		 * SIGWINCH signals here
 		 */
 		unblock_winch(); 
-		if(select(master + 1, &in_fds, NULL, NULL, &tv_select) == -1) {
+		if(select(master + 1, &in_fds, NULL, NULL, tv_select_p) == -1) {
 			if(errno == EINTR) {
 				block_winch();
 				continue;
@@ -202,21 +213,33 @@ void loop(VTerm *vt, int master) {
 			timer_init(&inter_io_timer);
 		}
 
-		if( (status = timer_thresh(&refresh_expire, 0, 500000)) ) {
-			force_refresh = 1;
+		/* this is here to make sure really long bursts dont 
+		 * look like frozen I/O. the user should see characters
+		 * whizzing by if there is that much output.
+		 */
+		if( (status = timer_thresh(&refresh_expire, 0, 300000)) ) { 
+			force_refresh = 1; /* must refresh at least 3 times per second */
 		}
 		else if(status < 0)
 			err_exit(errno, "timer error");
 		
-		if(force_refresh == 1 || (status = timer_thresh(&inter_io_timer, 0, 10000) ) ) {
+		/* if master pty is 'bursting' with I/O at a quick rate
+		 * we want to let the burst finish (up to a point: see refresh_expire)
+		 * and then refresh the screen, otherwise we waste a bunch of time
+		 * refreshing the screen with stuff that just gets scrolled off
+		 */
+		if(force_refresh != 0 || (status = timer_thresh(&inter_io_timer, 0, 10000) ) == 1 ) {
 			screen_damage_win();
 			screen_refresh();
 			timer_init(&inter_io_timer);
 			timer_init(&refresh_expire);
 			force_refresh = 0;
+			just_refreshed = 1;
 		}
 		else if(status < 0)
 			err_exit(errno, "timer error");
+		else
+			just_refreshed = 0; /* didnt refresh the screen on this iteration */
 
 		if(FD_ISSET(STDIN_FILENO, &in_fds) ) {
 			process_input(vt, master);
@@ -251,7 +274,7 @@ int main() {
 	g.winch_act.sa_flags = 0;
 
 	VTermScreenCallbacks screen_cbs = {
-		//.damage = screen_damage,
+		/*.damage = screen_damage,*/ /* for now we refresh the screen at our own rate based on a timer */
 		.movecursor = screen_movecursor,
 		.bell = screen_bell,
 		.settermprop = screen_settermprop
