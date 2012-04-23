@@ -15,7 +15,7 @@ struct opt_desc {
 };
 
 char opt_err_msg[64];
-static const char *default_argv[] = {"/bin/bash", NULL};
+static const char *default_argv[] = NCTE_DEFAULT_ARGV;
 
 #define LONG_ONLY_VAL(_index) ((1 << 11) + _index)
 
@@ -92,7 +92,7 @@ void opt_init(struct ncte_conf *conf) {
 	conf->cmd_argv = default_argv;
 }
 
-int opt_parse(int argc, char *argv[], struct ncte_conf *conf) {
+int opt_parse(int argc, char *const argv[], struct ncte_conf *conf) {
 	int index, c;
 	char optstring[64];
 	struct option long_options[NCTE_OPTLEN+1];
@@ -155,7 +155,7 @@ int opt_parse(int argc, char *argv[], struct ncte_conf *conf) {
 	/* non-default command was passed (as non-option args) */
 	if(optind < argc) {
 		conf->cmd_argc = argc - optind;
-		conf->cmd_argv = &argv[optind];
+		conf->cmd_argv = (const char *const *) &argv[optind];
 	}	
 
 	return 0;

@@ -1,6 +1,8 @@
 .SECONDARY:
 
-DEFINES			= -D_XOPEN_SOURCE -D_XOPEN_SOURCE_EXTENDED=1 -D_BSD_SOURCE #-D_POSIX_C_SOURCE=199309L
+DEFAULT_CMD		= '{"/bin/sh", NULL}'
+DEFAULT_TERM	= \"screen\"
+DEFINES			= -D_XOPEN_SOURCE -D_XOPEN_SOURCE_EXTENDED=1 -D_BSD_SOURCE -DNCTE_DEFAULT_TERM=$(DEFAULT_TERM) -DNCTE_DEFAULT_ARGV=$(DEFAULT_CMD)
 OUTPUT			= ncte
 BUILD			= ./build
 MKBUILD			:= $(shell mkdir -p $(BUILD) )
@@ -48,10 +50,10 @@ $(BUILD)/screen.o: ./src/screen.c ./src/vterm_ansi_colors.h
 $(BUILD)/%.o: $(BUILD)/%.c
 	$(CXX_CMD) -c $< -o $@
 
-$(BUILD)/%.o: ./src/%.c
+$(BUILD)/%.o: ./src/%.c ./src/%.h
 	$(CXX_CMD) -c $< -o $@
 
-$(BUILD)/%.o: ./src/%.c ./src/%.h
+$(BUILD)/%.o: ./src/%.c
 	$(CXX_CMD) -c $< -o $@
 
 $(BUILD)/%.o: ./test/%.c

@@ -259,6 +259,7 @@ int main() {
 	VTermScreen *vts;
 	pid_t child;
 	struct winsize size;
+	char termname[32];
 	char *shell;
 	char *args[2];
 		
@@ -285,7 +286,12 @@ int main() {
 	}
 	
 	setlocale(LC_ALL,"");
-	//putenv("TERM=screen");
+	if(getenv("TERM") == NULL) {
+		snprintf(termname, 32, "TERM=%s", NCTE_DEFAULT_TERM);
+		if(putenv(termname) != 0)
+			err_exit(errno, "error setting environment variable: %s", termname);
+	}
+
 	if(screen_init() != 0)
 		err_exit(0, "screen_init failure");
 
@@ -312,6 +318,11 @@ int main() {
 
 	child = forkpty(&g.master, NULL, NULL, &size);
 	if(child == 0) {
+		/* note: when checking ncte_conf here check if
+		 * c->cmd_argv != default_argv (address compare)
+		 * if true, then argv was specified on cmd line
+		 * and we shouldnt check use the SHELL env var.
+		 */
 		shell = getenv("SHELL");
 		if(shell == NULL)
 			shell = "/bin/sh"; /* most likely? */

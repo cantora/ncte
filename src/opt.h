@@ -6,7 +6,7 @@ struct ncte_conf {
 	const char *term;
 	const char *debug_file;
 	int cmd_argc;
-	const char **cmd_argv;
+	const char *const *cmd_argv;
 };
 
 enum opt_err {
@@ -17,7 +17,7 @@ enum opt_err {
 
 extern char opt_err_msg[];
 void opt_init(struct ncte_conf *options);
-int opt_parse(int argc, char *argv[], struct ncte_conf *options);
+int opt_parse(int argc, char *const argv[], struct ncte_conf *options);
 //void opt_usage(struct ncte_conf *options);
 //void opt_help(struct ncte_conf *options);
 
