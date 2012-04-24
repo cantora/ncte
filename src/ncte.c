@@ -48,6 +48,7 @@
 #include "screen.h"
 #include "err.h"
 #include "timer.h"
+#include "opt.h"
 
 #define BUF_SIZE 2048*4
 
@@ -57,6 +58,7 @@ static struct {
 	int master;		/* master pty */
 	VTerm *vt;		/* libvterm virtual terminal pointer */
 	char buf[BUF_SIZE]; /* IO buffer */
+	struct ncte_conf conf;
 } g; 
 
 static int set_nonblocking(int fd) {
@@ -255,14 +257,14 @@ void err_exit_cleanup(int error) {
 	screen_free();
 }
 
-int main() {
+int main(int argc, char *argv[]) {
 	VTermScreen *vts;
 	pid_t child;
 	struct winsize size;
 	char termname[32];
 	char *shell;
 	char *args[2];
-		
+
 	/* block winch right off the bat
 	 * because we want to defer 
 	 * processing of it until 
@@ -273,7 +275,7 @@ int main() {
 	g.winch_act.sa_handler = handler_winch;
 	sigemptyset(&g.winch_act.sa_mask);
 	g.winch_act.sa_flags = 0;
-
+	
 	VTermScreenCallbacks screen_cbs = {
 		/*.damage = screen_damage,*/ /* for now we refresh the screen at our own rate based on a timer */
 		.movecursor = screen_movecursor,

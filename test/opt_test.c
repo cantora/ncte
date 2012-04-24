@@ -4,7 +4,7 @@
 
 void print_conf(struct ncte_conf *c) {
 	int i;
-
+	
 	printf("ncterm: \t\t'%s'\n", c->ncterm);
 	printf("term: \t\t\t'%s'\n", c->term);
 	printf("debug_file: \t\t'%s'\n", c->debug_file);
@@ -21,6 +21,8 @@ int main(int argc, char *argv[]) {
 	struct ncte_conf c;
 
 	opt_init(&c);
+	
+	opt_print_help(argc, argv);
 	printf("DEFAULT:\n");
 	print_conf(&c);
 
