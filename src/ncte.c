@@ -231,7 +231,6 @@ void loop(VTerm *vt, int master) {
 		 * refreshing the screen with stuff that just gets scrolled off
 		 */
 		if(force_refresh != 0 || (status = timer_thresh(&inter_io_timer, 0, 10000) ) == 1 ) {
-			screen_damage_win();
 			screen_refresh();
 			timer_init(&inter_io_timer);
 			timer_init(&refresh_expire);
@@ -262,6 +261,7 @@ int main(int argc, char *argv[]) {
 	pid_t child;
 	struct winsize size;
 	const char *debug_file, *env_term;
+	struct termios child_termios;
 	
 	/* block winch right off the bat
 	 * because we want to defer 
@@ -293,9 +293,13 @@ int main(int argc, char *argv[]) {
 		
 		return 1;
 	}
-	
-	VTermScreenCallbacks screen_cbs = {
-		/*.damage = screen_damage,*/ /* for now we refresh the screen at our own rate based on a timer */
+
+	if(tcgetattr(STDIN_FILENO, &child_termios) != 0) {
+		err_exit(errno, "tcgetattr failed");
+	}
+
+  	VTermScreenCallbacks screen_cbs = {
+		.damage = screen_damage,  /* for now we refresh the screen at our own rate based on a timer */
 		.movecursor = screen_movecursor,
 		.bell = screen_bell,
 		.settermprop = screen_settermprop
@@ -344,7 +348,7 @@ int main(int argc, char *argv[]) {
 		goto cleanup;
 	}
 
-	child = forkpty(&g.master, NULL, NULL, &size);
+	child = forkpty(&g.master, NULL, &child_termios, &size);
 	if(child == 0) {
 		const char *child_term;
 		/* set terminal profile for CHILD to supplied --term arg if exists 
