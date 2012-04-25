@@ -58,7 +58,7 @@ static const struct opt_desc ncte_options[] = {
 		.name = OPT_NCTERM,
 		.usage = " TERMNAME",
 		.desc = {"sets the terminal profile used by ncurses",
-				 "\tdefault: the value of the --term option", NULL},
+				 "\tdefault: the current value of TERM in the environment", NULL},
 		.default_val = NULL, /* use current TERM environment variable */
 		.lopt = {OPT_NCTERM, 1, 0, LONG_ONLY_VAL(OPT_NCTERM_INDEX)}
 	},
@@ -117,11 +117,22 @@ static void init_long_options(struct option *long_options, char *optstring) {
 }
 
 void opt_init(struct ncte_conf *conf) {
+	const char *shell;
+
 #define DEFAULT_VAL(_name) ncte_options[OPT_##_name##_INDEX].default_val
 	conf->term = DEFAULT_VAL(TERM);
 	conf->ncterm = DEFAULT_VAL(NCTERM);
 	conf->debug_file = DEFAULT_VAL(DEBUG);
-	conf->cmd_argc = default_argc;
+	
+	shell = getenv("SHELL");
+	if(shell != NULL) {
+		default_argv[0] = shell;
+		default_argv[1] = NULL;
+		conf->cmd_argc = 1;
+	}
+	else {
+		conf->cmd_argc = default_argc;
+	}
 	conf->cmd_argv = default_argv;
 }
 
@@ -163,7 +174,7 @@ void opt_print_help(int argc, const char *const argv[]) {
 			fprintf(stdout, "%-" NCTE_EXPAND_QUOTE(F1_WIDTH) "s%s\n", (k == 0? f1 : ""), ncte_options[i].desc[k]);
 	}
 	
-	
+	fputc('\n', stdout);
 }
 
 int opt_parse(int argc, char *const argv[], struct ncte_conf *conf) {
@@ -178,11 +189,7 @@ int opt_parse(int argc, char *const argv[], struct ncte_conf *conf) {
 	index = 0;
 	while( (c = getopt_long(argc, argv, optstring, long_options, &index)) != -1 ) {
 		if(optarg && optarg[0] == '-') {
-			if(optopt == 0) 
-				snprintf(opt_err_msg, 64, "option '%s' missing argument", argv[optind-2]);
-			else
-				snprintf(opt_err_msg, 64, "option '-%c' missing argument'", optopt); 
-
+			snprintf(opt_err_msg, 64, "option '%s' missing argument", argv[optind-2]);
 			errno = OPT_ERR_MISSING_ARG;
 			goto fail;
 		}
@@ -206,21 +213,13 @@ int opt_parse(int argc, char *const argv[], struct ncte_conf *conf) {
 			break;
 			
 		case '?':
-			if(optopt == 0)
-				snprintf(opt_err_msg, 64, "unknown option '%s'", argv[optind-1]);
-			else
-				snprintf(opt_err_msg, 64, "unknown option '-%c'", optopt);
-
+			snprintf(opt_err_msg, 64, "unknown option '%s'", argv[optind-1]);
 			errno = OPT_ERR_UNKNOWN_OPTION;
 			goto fail;
 			break;
 		
 		case ':': 
-			if(optopt == 0) 
-				snprintf(opt_err_msg, 64, "option '%s' missing argument", argv[optind-1]);
-			else
-				snprintf(opt_err_msg, 64, "option '-%c' missing argument'", optopt); 
-
+			snprintf(opt_err_msg, 64, "option '%s' missing argument", argv[optind-1]);
 			errno = OPT_ERR_MISSING_ARG;
 			goto fail;
 			break;
@@ -229,6 +228,7 @@ int opt_parse(int argc, char *const argv[], struct ncte_conf *conf) {
 			printf("getopt returned char '%c' (%d)\n", c, c);
 			assert(0); /* shouldnt get here */
 		}
+		
 	}
 
 	/* non-default command was passed (as non-option args) */

@@ -261,10 +261,8 @@ int main(int argc, char *argv[]) {
 	VTermScreen *vts;
 	pid_t child;
 	struct winsize size;
-	char termname[32];
-	char *shell;
-	char *args[2];
-
+	const char *debug_file, *env_term;
+	
 	/* block winch right off the bat
 	 * because we want to defer 
 	 * processing of it until 
@@ -276,6 +274,26 @@ int main(int argc, char *argv[]) {
 	sigemptyset(&g.winch_act.sa_mask);
 	g.winch_act.sa_flags = 0;
 	
+	opt_init(&g.conf);
+	if(opt_parse(argc, argv, &g.conf) != 0) {
+		switch(errno) {
+		case OPT_ERR_HELP:
+			opt_print_help(argc, (const char *const *) argv);
+			break;
+			
+		case OPT_ERR_USAGE:
+			opt_print_usage(argc, (const char *const *) argv);
+			break;
+			
+		default:
+			fprintf(stdout, "%s\n", opt_err_msg);
+			opt_print_usage(argc, (const char *const *) argv);
+			fputc('\n', stdout);
+		}	
+		
+		return 1;
+	}
+	
 	VTermScreenCallbacks screen_cbs = {
 		/*.damage = screen_damage,*/ /* for now we refresh the screen at our own rate based on a timer */
 		.movecursor = screen_movecursor,
@@ -283,17 +301,25 @@ int main(int argc, char *argv[]) {
 		.settermprop = screen_settermprop
 	};
 
-	if(freopen("/tmp/ncte_log", "w", stderr) == NULL) {
+	if(g.conf.debug_file != NULL)
+		debug_file = g.conf.debug_file;
+	else
+		debug_file = "/dev/null";
+		
+	if(freopen(debug_file, "w", stderr) == NULL) {
 		err_exit(errno, "redirect stderr");
 	}
-	
+		
 	setlocale(LC_ALL,"");
-	if(getenv("TERM") == NULL) {
-		snprintf(termname, 32, "TERM=%s", NCTE_DEFAULT_TERM);
-		if(putenv(termname) != 0)
-			err_exit(errno, "error setting environment variable: %s", termname);
-	}
-
+	
+	
+	env_term = getenv("TERM"); 
+	/* set the PARENT terminal profile to --ncterm if supplied.
+	 * have to set this before calling screen_init to affect ncurses */
+	if(g.conf.ncterm != NULL)
+		if(setenv("TERM", g.conf.ncterm, 1) != 0)
+			err_exit(errno, "error setting environment variable: %s", g.conf.ncterm);
+					
 	if(screen_init() != 0)
 		err_exit(0, "screen_init failure");
 
@@ -320,20 +346,29 @@ int main(int argc, char *argv[]) {
 
 	child = forkpty(&g.master, NULL, NULL, &size);
 	if(child == 0) {
-		/* note: when checking ncte_conf here check if
-		 * c->cmd_argv != default_argv (address compare)
-		 * if true, then argv was specified on cmd line
-		 * and we shouldnt check use the SHELL env var.
+		const char *child_term;
+		/* set terminal profile for CHILD to supplied --term arg if exists 
+		 * otherwise make sure to reset the TERM variable to the initial
+		 * environment, even if it was null.
 		 */
-		shell = getenv("SHELL");
-		if(shell == NULL)
-			shell = "/bin/sh"; /* most likely? */
+		child_term = NULL;
+		if(g.conf.term != NULL) 
+			child_term = g.conf.term;
+		else if(env_term != NULL) 
+			child_term = env_term;
+			
+		if(child_term != NULL) {
+			if(setenv("TERM", child_term, 1) != 0)
+				err_exit(errno, "error setting environment variable: %s", child_term);
+		}
+		else {
+			if(unsetenv("TERM") != 0)
+				err_exit(errno, "error unsetting environment variable: TERM");
+		}
 
-		args[0] = shell;
-		args[1] = NULL;
-		unblock_winch();
-		execvp(shell, args);
-		err_exit(errno, "cannot exec %s", shell);
+		unblock_winch();	
+		execvp(g.conf.cmd_argv[0], (char *const *) g.conf.cmd_argv);
+		err_exit(errno, "cannot exec %s", g.conf.cmd_argv[0]);
 	}
 
 	if(set_nonblocking(g.master) != 0)
