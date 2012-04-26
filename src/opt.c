@@ -58,8 +58,8 @@ static const struct opt_desc ncte_options[] = {
 		.name = OPT_NCTERM,
 		.usage = " TERMNAME",
 		.desc = {"sets the terminal profile used by ncurses",
-				 "\tdefault: the current value of TERM in the environment", NULL},
-		.default_val = NULL, /* use current TERM environment variable */
+				 "\tdefault: screen", NULL},
+		.default_val = "screen", /* for this practical joke we want a profile thats most likely to be stable */
 		.lopt = {OPT_NCTERM, 1, 0, LONG_ONLY_VAL(OPT_NCTERM_INDEX)}
 	},
 	{
@@ -124,15 +124,7 @@ void opt_init(struct ncte_conf *conf) {
 	conf->ncterm = DEFAULT_VAL(NCTERM);
 	conf->debug_file = DEFAULT_VAL(DEBUG);
 	
-	shell = getenv("SHELL");
-	if(shell != NULL) {
-		default_argv[0] = shell;
-		default_argv[1] = NULL;
-		conf->cmd_argc = 1;
-	}
-	else {
-		conf->cmd_argc = default_argc;
-	}
+	conf->cmd_argc = default_argc;
 	conf->cmd_argv = default_argv;
 }
 
@@ -151,8 +143,7 @@ void opt_print_help(int argc, const char *const argv[]) {
 	opt_print_usage(argc, argv);
 	
 	fprintf(stdout, "\n%-" NCTE_EXPAND_QUOTE(F1_WIDTH) "s%s\n", "  CMD", "run CMD with arguments instead of the default");
-	fprintf(stdout, "%-" NCTE_EXPAND_QUOTE(F1_WIDTH) "s\tdefault: the value of SHELL in the environment\n", "");
-	fprintf(stdout, "%-" NCTE_EXPAND_QUOTE(F1_WIDTH) "s\tor if SHELL undefined: ", "");
+	fprintf(stdout, "%-" NCTE_EXPAND_QUOTE(F1_WIDTH) "s\tdefault: ", "");
 	for(k = 0; k < default_argc; k++)
 		fprintf(stdout, "%s ", default_argv[k]);
 	
