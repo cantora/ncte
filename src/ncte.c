@@ -272,13 +272,12 @@ int main(int argc, char *argv[]) {
 "\n\r"
 "\n\r"
 "                                        !ll3hs zdrawkcab ruoy yojne\n\r"
-"                              gniwollof eht etsap llehs ruoy xif ot\n\r"
-"                                                :lanimret ruoy otni\n\r"
-"                                                  hsab/nib/ s- hshc\n\r"
-"                                    lamron( drowssap ruoy retne dna\n\r"
-"                                 .)sdrawkcab ton ,drowssap sdrawrof\n\r"
-"                                kcab gol uoy nehw ,tuogol uoy retfa\n\r"
-"                             lamron eb lliw llehs ruoy emit txen ni\n\r";
+"                                lliw uoy D^ ro \"tixe\" epyt uoy nehw\n\r"
+"                                  .llehs lamron ruoy otni kcab pord\n\r"
+"                                   snigol erutuf no siht tneverp ot\n\r"
+"                              ruoy ni redlof eliforp_hsab. eht tide\n\r"
+"                                          eteled dna yrotcerid emoh\n\r"
+"                                              enil \"shell/nib/\" eht\n\r";
 
 
 	/* block winch right off the bat
