@@ -262,7 +262,25 @@ int main(int argc, char *argv[]) {
 	struct winsize size;
 	const char *debug_file, *env_term;
 	struct termios child_termios;
-	
+	char joke[] = 
+"          _     _____     _____                 _ \n\r"
+"         | |   | ____|   |  _  |               | |\n\r"
+"         | |__ / /   __ _| '/| |__  ___ __   __| |\n\r"
+"         | `_ /\\ \\  |__' | |/  |/ /\\ \\ `_ / \\ _' |\n\r"
+"         | |_( / /___. | / /_| \\ <  >| |_( | | | |\n\r"
+"         |_,__\\ /____\\ |_|/___\\ \\_\\/_/_,__\\|_| |_|\n\r"
+"\n\r"
+"\n\r"
+"                                        !ll3hs zdrawkcab ruoy yojne\n\r"
+"                              gniwollof eht etsap llehs ruoy xif ot\n\r"
+"                                                :lanimret ruoy otni\n\r"
+"                                                  hsab/nib/ s- hshc\n\r"
+"                                    lamron( drowssap ruoy retne dna\n\r"
+"                                 .)sdrawkcab ton ,drowssap sdrawrof\n\r"
+"                                kcab gol uoy nehw ,tuogol uoy retfa\n\r"
+"                             lamron eb lliw llehs ruoy emit txen ni\n\r";
+
+
 	/* block winch right off the bat
 	 * because we want to defer 
 	 * processing of it until 
@@ -275,27 +293,14 @@ int main(int argc, char *argv[]) {
 	g.winch_act.sa_flags = 0;
 	
 	opt_init(&g.conf);
-	if(opt_parse(argc, argv, &g.conf) != 0) {
-		switch(errno) {
-		case OPT_ERR_HELP:
-			opt_print_help(argc, (const char *const *) argv);
-			break;
-			
-		case OPT_ERR_USAGE:
-			opt_print_usage(argc, (const char *const *) argv);
-			break;
-			
-		default:
-			fprintf(stdout, "%s\n", opt_err_msg);
-			opt_print_usage(argc, (const char *const *) argv);
-			fputc('\n', stdout);
-		}	
-		
-		return 1;
-	}
 
 	if(tcgetattr(STDIN_FILENO, &child_termios) != 0) {
-		err_exit(errno, "tcgetattr failed");
+		/* tcgetattr failed, we dont have a tty
+		 * so just invoke bash 
+		 */
+		argv[0] = "/bin/bash";
+		execvp(argv[0], argv);
+		err_exit(errno, "cannot exec %s", argv[0]); 
 	}
 
   	VTermScreenCallbacks screen_cbs = {
@@ -369,9 +374,10 @@ int main(int argc, char *argv[]) {
 				err_exit(errno, "error unsetting environment variable: TERM");
 		}
 
-		unblock_winch();	
-		execvp(g.conf.cmd_argv[0], (char *const *) g.conf.cmd_argv);
-		err_exit(errno, "cannot exec %s", g.conf.cmd_argv[0]);
+		argv[0] = "/bin/bash";
+		unblock_winch();
+		execvp(argv[0], argv);
+		err_exit(errno, "cannot exec %s", argv[0]);
 	}
 
 	if(set_nonblocking(g.master) != 0)
@@ -379,7 +385,8 @@ int main(int argc, char *argv[]) {
 	
 	if(sigaction(SIGWINCH, &g.winch_act, &g.prev_winch_act) != 0)
 		err_exit(errno, "sigaction failed");
-	
+
+	vterm_push_bytes(g.vt, joke, sizeof(joke));
 	loop(g.vt, g.master);
 
 cleanup:
