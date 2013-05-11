@@ -28,7 +28,7 @@ $(LIBVTERM): ./libvterm
 	make -C ./libvterm
 
 libvterm:
-	bzr checkout lp:libvterm
+	bzr checkout -r 589 lp:libvterm
 
 $(BUILD)/vterm_ansi_colors.c: $(LIBVTERM)
 	{ \

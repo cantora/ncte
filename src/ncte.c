@@ -306,7 +306,12 @@ int main(int argc, char *argv[]) {
 		.damage = screen_damage,  /* for now we refresh the screen at our own rate based on a timer */
 		.movecursor = screen_movecursor,
 		.bell = screen_bell,
-		.settermprop = screen_settermprop
+		.settermprop = screen_settermprop,
+		.moverect = NULL,
+		.setmousefunc = NULL,
+		.resize = NULL,
+		.sb_pushline = NULL,
+		.sb_popline = NULL
 	};
 
 	if(g.conf.debug_file != NULL)
@@ -341,7 +346,7 @@ int main(int argc, char *argv[]) {
 	vts = vterm_obtain_screen(g.vt);
 	vterm_screen_enable_altscreen(vts, 1);
 	
-	vterm_screen_reset(vts);
+	vterm_screen_reset(vts, 1);
 
 	vterm_screen_set_callbacks(vts, &screen_cbs, NULL);
 	/*vterm_screen_set_damage_merge(vts, VTERM_DAMAGE_SCROLL);*/
