@@ -4,6 +4,8 @@ ncte - ncurses terminal emulator
    a small demonstration of an ncurses based terminal emulator
    using libvterm (https://code.launchpad.net/~leonerd/libvterm)
 
+   if you find this code interesting you may want to look at 
+   github.com/cantora/aug.
 
 compilation:
 
